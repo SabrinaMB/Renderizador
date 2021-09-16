@@ -9,6 +9,9 @@ Disciplina: Computação Gráfica
 Data:
 """
 
+import numpy as np
+import rotinas
+import rotation_matrix
 import gpu          # Simula os recursos de uma GPU
 
 class GL:
@@ -45,6 +48,55 @@ class GL:
         print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
         print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
 
+        # for i in range(0, len(point), 9):
+            #triangles = [point[x:x+3] for x in range(i, i + 7, 3)]
+
+            
+
+            # print(point)
+            # print(triangles)
+
+
+            # x_1 = point[i]
+            # y_1 = point[i + 1]
+            # x_2 = point[i + 2]
+            # y_2 = point[i + 3]
+            # x_3 = point[i + 4]
+            # y_3 = point[i + 5]
+            # minX = x_1
+            # maxX = x_1
+            # minY = y_1
+            # maxY = y_1
+            # if x_2 > maxX:
+            #     maxX = x_2
+            # if x_3 > maxX:
+            #     maxX = x_3
+            # if y_2 > maxY:
+            #     maxY = y_2
+            # if y_3 > maxY:
+            #     maxY = y_3
+            # if x_2 < minX:
+            #     minX = x_2
+            # if x_3 < minX:
+            #     minX = x_3
+            # if y_2 < minY:
+            #     minY = y_2
+            # if y_3 < minY:
+            #     minY = y_3
+
+            # aliasing = 4
+
+            # for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
+            #     for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
+            #         sumk = 0
+            #         for kx in range(aliasing):
+            #             for ky in range(aliasing):
+            #                 sumk += rotinas.inside(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
+            #         sumk = sumk*255/aliasing
+            #         if sumk > 0:
+            #             gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, [sumk * colors['emissiveColor'][0],
+            #                             sumk * colors['emissiveColor'][1], sumk * colors['emissiveColor'][2]])
+
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
         gpu.GPU.draw_pixels([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
 
@@ -54,6 +106,8 @@ class GL:
         # Na função de viewpoint você receberá a posição, orientação e campo de visão da
         # câmera virtual. Use esses dados para poder calcular e criar a matriz de projeção
         # perspectiva para poder aplicar nos pontos dos objetos geométricos.
+
+
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Viewpoint : ", end='')
@@ -72,15 +126,38 @@ class GL:
         # Quando se entrar em um nó transform se deverá salvar a matriz de transformação dos
         # modelos do mundo em alguma estrutura de pilha.
 
+
+        # translation = [2, 1, 1]
+        # scale = [1, 3, 2]
+        # rotation = [1, 0, 0, -1.57]
+
+        # escala
+        escala = np.diag([scale[x] if (x < 3) else 1 for x in range(4)])
+        #print(escala)
+
+        # translacao
+        translacao = np.eye(4)
+        translacao[:3,3] = translation
+        #print(translacao)
+
+        # rotacao
+        rotacao = rotation_matrix.rotation_matrix(rotation)
+        #print(rotacao)
+
+        # translacao x rotacao x escala
+        transformation = np.matmul(translacao, rotacao)
+        transformation = np.matmul(transformation, escala)
+        print(f"transformacao: \n{transformation}")
+
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Transform : ", end='')
-        if translation:
-            print("translation = {0} ".format(translation), end='') # imprime no terminal
-        if scale:
-            print("scale = {0} ".format(scale), end='') # imprime no terminal
-        if rotation:
-            print("rotation = {0} ".format(rotation), end='') # imprime no terminal
-        print("")
+        # print("Transform : ", end='')
+        # if translation:
+        #     print("translation = {0} ".format(translation), end='') # imprime no terminal
+        # if scale:
+        #     print("scale = {0} ".format(scale), end='') # imprime no terminal
+        # if rotation:
+        #     print("rotation = {0} ".format(rotation), end='') # imprime no terminal
+        # print("")
 
     @staticmethod
     def transform_out():
