@@ -144,8 +144,9 @@ def triangleSet2D(vertices, colors):
                         sumk += inside(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
                 sumk = sumk*255/aliasing
                 if sumk > 0:
-                    gpu.GPU.set_pixel(int(x/aliasing), int(y/aliasing), sumk * colors['emissiveColor'][0],
-                                      sumk * colors['emissiveColor'][1], sumk * colors['emissiveColor'][2])
+                    # draw_pixels([10, 10], gpu.GPU.RGB8,
+                    gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, [sumk * colors['emissiveColor'][0],
+                                      sumk * colors['emissiveColor'][1], sumk * colors['emissiveColor'][2]])
 
 
 

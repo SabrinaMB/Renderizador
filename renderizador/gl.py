@@ -9,6 +9,7 @@ Disciplina: Computação Gráfica
 Data:
 """
 
+from math import tan, atan
 import numpy as np
 import rotinas
 import rotation_matrix
@@ -21,6 +22,9 @@ class GL:
     height = 600  # altura da tela
     near = 0.01   # plano de corte próximo
     far = 1000    # plano de corte distante
+
+    # def __init__(self):
+    #     self.
 
     @staticmethod
     def setup(width, height, near=0.01, far=1000):
@@ -43,62 +47,48 @@ class GL:
         # triângulo, e assim por diante.
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o TriangleSet
         # você pode assumir o desenho das linhas com a cor emissiva (emissiveColor).
+        scale_matrix = np.array([
+            [(GL.width/2), 0, 0, 0],
+            [0, (GL.height/2), 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
-        print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
+        translator_matrix = np.array([
+            [1, 0, 0, 1],
+            [0, 1, 0, 1],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
+        
+        mirror_matrix = np.array([
+            [1, 0, 0, 0],
+            [0, -1, 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
 
-        # for i in range(0, len(point), 9):
-            #triangles = [point[x:x+3] for x in range(i, i + 7, 3)]
+        tela = np.matmul(scale_matrix, translator_matrix)
+        tela = np.matmul(tela, mirror_matrix)
+        
+        triangles = [np.array([[point[x], point[x + 3], point[x + 6]], [point[x + 1], point[x + 3 + 1], point[x + 6 + 1]], [point[x + 2], point[x + 3 + 2], point[x + 6 + 2]], [1, 1, 1]]) for x in range(0, len(point), 9)]
 
-            
+        for triangulo in triangles:
 
-            # print(point)
-            # print(triangles)
+            triangulo = np.matmul(GL.geometry_transformation, triangulo)
 
+            triangulo = np.matmul(GL.viewpoint_lookat, triangulo) 
 
-            # x_1 = point[i]
-            # y_1 = point[i + 1]
-            # x_2 = point[i + 2]
-            # y_2 = point[i + 3]
-            # x_3 = point[i + 4]
-            # y_3 = point[i + 5]
-            # minX = x_1
-            # maxX = x_1
-            # minY = y_1
-            # maxY = y_1
-            # if x_2 > maxX:
-            #     maxX = x_2
-            # if x_3 > maxX:
-            #     maxX = x_3
-            # if y_2 > maxY:
-            #     maxY = y_2
-            # if y_3 > maxY:
-            #     maxY = y_3
-            # if x_2 < minX:
-            #     minX = x_2
-            # if x_3 < minX:
-            #     minX = x_3
-            # if y_2 < minY:
-            #     minY = y_2
-            # if y_3 < minY:
-            #     minY = y_3
+            triangulo = np.matmul(GL.viewpoint_projecao, triangulo)
 
-            # aliasing = 4
+            triangulo = triangulo/triangulo[-1, :]
 
-            # for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
-            #     for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
-            #         sumk = 0
-            #         for kx in range(aliasing):
-            #             for ky in range(aliasing):
-            #                 sumk += rotinas.inside(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
-            #         sumk = sumk*255/aliasing
-            #         if sumk > 0:
-            #             gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, [sumk * colors['emissiveColor'][0],
-            #                             sumk * colors['emissiveColor'][1], sumk * colors['emissiveColor'][2]])
+            triangulo = np.matmul(tela, triangulo)[0:2,:].flatten('F')
 
-        # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixels([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+            colors['emissiveColor'] = [0, 0, 1]
+
+            rotinas.triangleSet2D(triangulo, colors)
+
 
     @staticmethod
     def viewpoint(position, orientation, fieldOfView):
@@ -107,7 +97,31 @@ class GL:
         # câmera virtual. Use esses dados para poder calcular e criar a matriz de projeção
         # perspectiva para poder aplicar nos pontos dos objetos geométricos.
 
+        # position = [-8, 1, 1]
+        # orientation = [0, 1, 0, -1.57]
 
+        # translacao
+        translacao = np.eye(4)
+        translacao[:3,3] = -np.array(position)
+        #print(translacao)
+
+        # rotacao
+        rotacao = rotation_matrix.rotation_matrix(orientation).T
+        #print(rotacao)
+
+        GL.viewpoint_lookat = np.matmul(rotacao, translacao)
+        #print(transformation)
+
+        fovy = 2*atan(tan(fieldOfView/2)*(GL.height/(((GL.height**2) + (GL.width**2))**0.5)))
+        top = GL.near * tan(fovy)
+        right = top * (GL.width/GL.height)
+
+        GL.viewpoint_projecao = np.array([
+            [GL.near/right, 0, 0, 0],
+            [0, GL.near/top, 0, 0],
+            [0, 0, -(GL.far + GL.near)/(GL.far - GL.near), -(2*GL.far*GL.near)/(GL.far - GL.near)],
+            [0, 0, -1, 0],
+        ])
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Viewpoint : ", end='')
@@ -146,18 +160,18 @@ class GL:
 
         # translacao x rotacao x escala
         transformation = np.matmul(translacao, rotacao)
-        transformation = np.matmul(transformation, escala)
+        GL.geometry_transformation = np.matmul(transformation, escala)
         print(f"transformacao: \n{transformation}")
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("Transform : ", end='')
-        # if translation:
-        #     print("translation = {0} ".format(translation), end='') # imprime no terminal
-        # if scale:
-        #     print("scale = {0} ".format(scale), end='') # imprime no terminal
-        # if rotation:
-        #     print("rotation = {0} ".format(rotation), end='') # imprime no terminal
-        # print("")
+        print("Transform : ", end='')
+        if translation:
+            print("translation = {0} ".format(translation), end='') # imprime no terminal
+        if scale:
+            print("scale = {0} ".format(scale), end='') # imprime no terminal
+        if rotation:
+            print("rotation = {0} ".format(rotation), end='') # imprime no terminal
+        print("")
 
     @staticmethod
     def transform_out():
