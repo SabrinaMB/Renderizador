@@ -306,7 +306,18 @@ class GL:
         # essa caixa você vai provavelmente querer tesselar ela em triângulos, para isso
         # encontre os vértices e defina os triângulos.
 
-        triangles = []
+        coords = []
+        for i in range(2):
+            for i2 in range(2):
+                for i3 in range(2):
+                    lista = [size[0]*i, size[1]*i2, size[2]*i3]
+                    for item in lista:
+                        coords.append(item)
+                    #print(f"{size[0]*i} {size[1]*i2} {size[2]*i3}")
+        
+        #print(coords)
+
+        GL.triangleStripSet(coords, [len(coords)], colors)
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Box : size = {0}".format(size)) # imprime no terminal pontos
