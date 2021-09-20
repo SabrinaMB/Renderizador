@@ -72,6 +72,8 @@ class GL:
         tela = np.matmul(tela, mirror_matrix)
         
         triangles = [np.array([[point[x], point[x + 3], point[x + 6]], [point[x + 1], point[x + 3 + 1], point[x + 6 + 1]], [point[x + 2], point[x + 3 + 2], point[x + 6 + 2]], [1, 1, 1]]) for x in range(0, len(point), 9)]
+        
+        transformed_triangles = []
 
         for triangulo in triangles:
 
@@ -85,9 +87,18 @@ class GL:
 
             triangulo = np.matmul(tela, triangulo)[0:2,:].flatten('F')
 
+            # print(triangulo)
+            
+            for coord in triangulo:
+                transformed_triangles.append(coord)
+
+        if sum(colors['emissiveColor']) == 0:
             colors['emissiveColor'] = [0, 0, 1]
 
-            rotinas.triangleSet2D(triangulo, colors)
+            # rotinas.triangleSet2D(triangulo, colors)
+
+        # print(transformed_triangles)
+        rotinas.triangleSet2D(transformed_triangles, colors)
 
 
     @staticmethod
@@ -161,7 +172,7 @@ class GL:
         # translacao x rotacao x escala
         transformation = np.matmul(translacao, rotacao)
         GL.geometry_transformation = np.matmul(transformation, escala)
-        print(f"transformacao: \n{transformation}")
+        # print(f"transformacao: \n{transformation}")
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Transform : ", end='')
@@ -198,6 +209,34 @@ class GL:
         # depois 2, 3 e 4, e assim por diante. Cuidado com a orientação dos vértices, ou seja,
         # todos no sentido horário ou todos no sentido anti-horário, conforme especificado.
 
+        ################### THIS WORKS
+
+        new_point = []
+
+        for x in range(0, len(point) - 9, 3):
+            if (x/3)%2 == 0:
+                for y in range(9):
+                    new_point.append(point[x + y])
+            else:
+                for k in range(2, -1, -1):
+                    for y in range(3):
+                        new_point.append(point[x + k*3 + y])
+
+        for y in range(6):
+            new_point.append(point[len(point) - 6 + y])
+        
+        for x in range(3):
+            new_point.append(point[len(point) - 9 + x])
+
+        #colors['emissiveColor'] = [0, 1, 0]
+
+        GL.triangleSet(new_point, colors)
+
+        ################### THIS WORKS
+
+        
+        
+
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("TriangleStripSet : pontos = {0} ".format(point), end='')
         for i, strip in enumerate(stripCount):
@@ -223,6 +262,33 @@ class GL:
         # depois 2, 3 e 4, e assim por diante. Cuidado com a orientação dos vértices, ou seja,
         # todos no sentido horário ou todos no sentido anti-horário, conforme especificado.
 
+        ################### THIS WORKS
+
+        new_point = []
+
+        for x in range(0, len(point) - 9, 3):
+            if (x/3)%2 == 0:
+                for y in range(9):
+                    new_point.append(point[x + y])
+            else:
+                for k in range(2, -1, -1):
+                    for y in range(3):
+                        new_point.append(point[x + k*3 + y])
+
+        for y in range(6):
+            new_point.append(point[len(point) - 6 + y])
+        
+        for x in range(3):
+            new_point.append(point[len(point) - 9 + x])
+
+
+        if sum(colors['emissiveColor']) == 0:
+            colors['emissiveColor'] = [1, 1, 0]
+
+        GL.triangleSet(new_point, colors)
+
+        ################### THIS WORKS
+
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("IndexedTriangleStripSet : pontos = {0}, index = {1}".format(point, index))
         print("IndexedTriangleStripSet : colors = {0}".format(colors)) # imprime as cores
@@ -239,6 +305,8 @@ class GL:
         # e Z, respectivamente, e cada valor do tamanho deve ser maior que zero. Para desenha
         # essa caixa você vai provavelmente querer tesselar ela em triângulos, para isso
         # encontre os vértices e defina os triângulos.
+
+        triangles = []
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Box : size = {0}".format(size)) # imprime no terminal pontos

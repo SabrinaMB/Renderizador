@@ -2,13 +2,13 @@ import numpy as np
 from math import sin, cos, pi
 
 def sqr(a, b):
-    return np.round(1 - (2*((a**2) + (b**2))), 2)
+    return np.round(1 - (2*((a**2) + (b**2))), 10)
 
 def neg(a, b, c, d):
-    return np.round(2*((a*b) - (c*d)), 2)
+    return np.round(2*((a*b) - (c*d)), 10)
 
 def pos(a, b, c, d):
-    return np.round(2*((a*b) + (c*d)), 2)
+    return np.round(2*((a*b) + (c*d)), 10)
 
 def rotation_matrix(xyzt):
 
