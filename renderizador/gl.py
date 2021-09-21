@@ -306,18 +306,58 @@ class GL:
         # essa caixa você vai provavelmente querer tesselar ela em triângulos, para isso
         # encontre os vértices e defina os triângulos.
 
-        coords = []
-        for i in range(2):
-            for i2 in range(2):
-                for i3 in range(2):
-                    lista = [size[0]*i, size[1]*i2, size[2]*i3]
-                    for item in lista:
-                        coords.append(item)
-                    #print(f"{size[0]*i} {size[1]*i2} {size[2]*i3}")
-        
-        #print(coords)
 
+
+
+        top = []
+        bottom = []
+
+        for y in [0,1]:
+            for x in [0,1]:
+                for z in [0,1]:
+                    lista = [size[0]*x, size[1]*y, size[2]*z]
+                    # print(lista)
+                    for item in lista:
+                        if y == 1:
+                            top.append(item)
+                        else:
+                            bottom.append(item)
+        
+        for i in range(3):
+            top.append(top[i])
+            bottom.append(bottom[i])
+
+        GL.triangleStripSet(top, [len(top)], colors)
+        GL.triangleStripSet(bottom, [len(bottom)], colors)
+
+        ############### THIS TOOO
+
+
+        ############### THIS WORKS
+
+        coords = []
+        for z in range(2):
+            if z == 0:
+                for x in range(2):
+                    for y in range(2):
+                        lista = [size[0]*x, size[1]*y, size[2]*z]
+                        # print(lista)
+                        for item in lista:
+                            coords.append(item)
+            elif z==1:
+                for x in [1, 0]:
+                    for y in range(2):
+                        lista = [size[0]*x, size[1]*y, size[2]*z]
+                        # print(lista)
+                        for item in lista:
+                            coords.append(item)
+        
+        for i in range(6):
+            coords.append(coords[i])
+        
         GL.triangleStripSet(coords, [len(coords)], colors)
+
+        ############### THIS WORKS
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Box : size = {0}".format(size)) # imprime no terminal pontos
