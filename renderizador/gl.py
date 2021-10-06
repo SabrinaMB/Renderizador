@@ -10,6 +10,7 @@ Data:
 """
 
 from math import tan, atan
+from PIL.Image import new
 import numpy as np
 import rotinas
 import rotation_matrix
@@ -391,6 +392,131 @@ class GL:
         # textura para o poligono, para isso, use as coordenadas de textura e depois aplique a
         # cor da textura conforme a posição do mapeamento. Dentro da classe GPU já está
         # implementadado um método para a leitura de imagens.
+
+        point = []
+        new_colors = []
+
+        for i in coordIndex:
+            if i != -1:
+                for eixo in range(3):
+                    point.append(coord[i*3 + eixo])
+
+        # print(point)
+        
+        for i in colorIndex:
+            if i != -1:
+                # for eixo in range(3):
+                    # point.append(coord[i*3 + eixo])
+                new_colors.append(i)# + eixo])
+
+        # print(new_colors)
+
+        # if sum(colors['emissiveColor']) == 0:
+        #     colors['emissiveColor'] = [1, 1, 0]
+
+        # GL.triangleSet(new_point, colors)
+
+        scale_matrix = np.array([
+            [(GL.width/2), 0, 0, 0],
+            [0, (GL.height/2), 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
+
+        translator_matrix = np.array([
+            [1, 0, 0, 1],
+            [0, 1, 0, 1],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
+        
+        mirror_matrix = np.array([
+            [1, 0, 0, 0],
+            [0, -1, 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
+
+        tela = np.matmul(scale_matrix, translator_matrix)
+        tela = np.matmul(tela, mirror_matrix)
+        
+        triangles = [np.array([[point[x], point[x + 3], point[x + 6]], [point[x + 1], point[x + 3 + 1], point[x + 6 + 1]], [point[x + 2], point[x + 3 + 2], point[x + 6 + 2]], [1, 1, 1]]) for x in range(0, len(point), 9)]
+        # print(triangles)
+        transformed_triangles = []
+
+        for triangulo in triangles:
+
+            triangulo = np.matmul(GL.geometry_transformation, triangulo)
+
+            triangulo = np.matmul(GL.viewpoint_lookat, triangulo) 
+
+            triangulo = np.matmul(GL.viewpoint_projecao, triangulo)
+
+            triangulo = triangulo/triangulo[-1, :]
+
+            triangulo = np.matmul(tela, triangulo)
+
+            triangulo = triangulo[0:3,:].flatten('F')
+
+            for coordenada in triangulo:
+                transformed_triangles.append(coordenada)
+
+        # if sum(colors['emissiveColor']) == 0:
+        #     colors['emissiveColor'] = [0, 0, 1]
+
+        vertices = transformed_triangles
+
+        for k in range(0, len(vertices), 9):
+
+            lista = [vertices[k + i] for i in range(0, 9) if (i + 1) % 3 != 0]
+            x_1, y_1, x_2, y_2, x_3, y_3 = lista
+            minX = min([lista[i*2] for i in range(3)])
+            maxX = max([lista[i*2] for i in range(3)])
+            minY = min([lista[1 + i*2] for i in range(3)])
+            maxY = max([lista[1 + i*2] for i in range(3)])
+
+            # print(lista)
+
+            aliasing = 1
+            rgb_print = []
+
+            z0, z1, z2 = [1/vertices[k + i] for i in range(0, 9) if (i + 1) % 3 == 0]
+
+            rgb0 = [color[new_colors[(k//9)*3 + 2]*3 + bolas] for bolas in range(3)]
+            rgb1 = [color[new_colors[(k//9)*3 + 0]*3 + bolas] for bolas in range(3)]
+            rgb2 = [color[new_colors[(k//9)*3 + 1]*3 + bolas] for bolas in range(3)]
+
+
+            for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
+                for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
+                    
+                    sumk = 0
+                    rgb = [0, 0, 0]
+                    
+                    for kx in range(aliasing):
+                        for ky in range(aliasing):
+                            
+                            sksk = rotinas.inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
+
+                            if sksk is not None:
+                                alpha, beta, gamma = sksk
+
+                                Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
+                                
+                                rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
+                                rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
+                                rgb[2] += Z_zao*((rgb0[2]*z0*alpha) + (rgb1[2]*z1*beta) + (rgb2[2]*z2*gamma))
+
+                    
+                    rgb[0] *= 255/aliasing
+                    rgb[1] *= 255/aliasing
+                    rgb[2] *= 255/aliasing
+                    
+                    if sum(rgb) > 0:
+                        gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, rgb)
+                        
+            # print(rgb_print)
+
 
         # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("IndexedFaceSet : ")

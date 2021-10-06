@@ -97,11 +97,21 @@ def inside(x_A, y_A, x_B, y_B, x_C, y_C, x_ponto, y_ponto):
     d1 = dot(x_A, y_A, x_B, y_B, x_ponto, y_ponto)
     d2 = dot(x_B, y_B, x_C, y_C, x_ponto, y_ponto)
     d3 = dot(x_C, y_C, x_A, y_A, x_ponto, y_ponto)
-    if dot(x_A, y_A, x_B, y_B, x_ponto, y_ponto) >= 0 and dot(x_B, y_B, x_C, y_C, x_ponto, y_ponto) >= 0 and dot(x_C, y_C, x_A, y_A, x_ponto, y_ponto) >= 0:
+    if d1 >= 0 and d2 >= 0 and d3 >= 0:
+    # if dot(x_A, y_A, x_B, y_B, x_ponto, y_ponto) >= 0 and dot(x_B, y_B, x_C, y_C, x_ponto, y_ponto) >= 0 and dot(x_C, y_C, x_A, y_A, x_ponto, y_ponto) >= 0:
         return 1
     else:
         return 0
 
+def inside_fuq(x_A, y_A, x_B, y_B, x_C, y_C, x_ponto, y_ponto):
+    d1 = dot(x_A, y_A, x_B, y_B, x_ponto, y_ponto)
+    d2 = dot(x_B, y_B, x_C, y_C, x_ponto, y_ponto)
+    d3 = dot(x_C, y_C, x_A, y_A, x_ponto, y_ponto)
+    # if d1 >= 0 and d2 >= 0 and d3 >= 0:
+    if dot(x_A, y_A, x_B, y_B, x_ponto, y_ponto) >= 0 and dot(x_B, y_B, x_C, y_C, x_ponto, y_ponto) >= 0 and dot(x_C, y_C, x_A, y_A, x_ponto, y_ponto) >= 0:
+        return [d1/dot(x_A, y_A, x_B, y_B, x_C, y_C), d2/dot(x_B, y_B, x_C, y_C, x_A, y_A), d3/dot(x_C, y_C, x_A, y_A, x_B, y_B)]
+    else:
+        return None
 
 # web3d.org/documents/specifications/19775-1/V3.0/Part01/components/geometry2D.html#TriangleSet2D
 def triangleSet2D(vertices, colors):
