@@ -144,7 +144,7 @@ def triangleSet2D(vertices, colors):
         if y_3 < minY:
             minY = y_3
 
-        aliasing = 4
+        aliasing = 1
 
         for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
             for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
@@ -155,8 +155,15 @@ def triangleSet2D(vertices, colors):
                 sumk = sumk*255/aliasing
                 if sumk > 0:
                     # draw_pixels([10, 10], gpu.GPU.RGB8,
-                    gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, [sumk * colors['emissiveColor'][0],
-                                      sumk * colors['emissiveColor'][1], sumk * colors['emissiveColor'][2]])
+                    if sum(colors["emissiveColor"]) > 0:
+                        gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, [sumk * colors['emissiveColor'][0],
+                                          sumk * colors['emissiveColor'][1], sumk * colors['emissiveColor'][2]])
+                    elif sum(colors["diffuseColor"]) > 0:
+                        gpu.GPU.draw_pixels([int(x / aliasing), int(y / aliasing)], gpu.GPU.RGB8,
+                                            [sumk * colors['diffuseColor'][0],
+                                             sumk * colors['diffuseColor'][1], sumk * colors['diffuseColor'][2]])
+                    else:
+                        print("color error")
 
 
 

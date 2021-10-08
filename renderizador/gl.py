@@ -4,7 +4,7 @@
 """
 Biblioteca Gráfica / Graphics Library.
 
-Desenvolvido por: <SEU NOME AQUI>
+Desenvolvido por: Sabrina e Matteo
 Disciplina: Computação Gráfica
 Data:
 """
@@ -23,20 +23,23 @@ class GL:
     height = 600  # altura da tela
     near = 0.01   # plano de corte próximo
     far = 1000    # plano de corte distante
+    pilha = []
 
     # def __init__(self):
     #     self.
 
     @staticmethod
     def setup(width, height, near=0.01, far=1000):
-        """Definr parametros para câmera de razão de aspecto, plano próximo e distante."""
+        """Definir parâmetros para camera de razão de aspecto, plano próximo e distante."""
         GL.width = width
         GL.height = height
         GL.near = near
         GL.far = far
+        GL.pilha = []
 
     @staticmethod
     def triangleSet(point, colors):
+        print("triangleSet")
         """Função usada para renderizar TriangleSet."""
         # Nessa função você receberá pontos no parâmetro point, esses pontos são uma lista
         # de pontos x, y, e z sempre na ordem. Assim point[0] é o valor da coordenada x do
@@ -75,10 +78,13 @@ class GL:
         triangles = [np.array([[point[x], point[x + 3], point[x + 6]], [point[x + 1], point[x + 3 + 1], point[x + 6 + 1]], [point[x + 2], point[x + 3 + 2], point[x + 6 + 2]], [1, 1, 1]]) for x in range(0, len(point), 9)]
         
         transformed_triangles = []
+        matriz_transformacao = GL.pilha[0]
+        for item in GL.pilha[1:]:
+            matriz_transformacao = np.matmul(matriz_transformacao, item)
 
         for triangulo in triangles:
 
-            triangulo = np.matmul(GL.geometry_transformation, triangulo)
+            triangulo = np.matmul(matriz_transformacao, triangulo)
 
             triangulo = np.matmul(GL.viewpoint_lookat, triangulo) 
 
@@ -92,18 +98,18 @@ class GL:
             
             for coord in triangulo:
                 transformed_triangles.append(coord)
-
-        if sum(colors['emissiveColor']) == 0:
-            colors['emissiveColor'] = [0, 0, 1]
+        #
+        # if sum(colors['emissiveColor']) == 0:
+        #     colors['emissiveColor'] = [0, 0, 1]
 
             # rotinas.triangleSet2D(triangulo, colors)
-
         # print(transformed_triangles)
         rotinas.triangleSet2D(transformed_triangles, colors)
 
 
     @staticmethod
     def viewpoint(position, orientation, fieldOfView):
+        print("viewpoint")
         """Função usada para renderizar (na verdade coletar os dados) de Viewpoint."""
         # Na função de viewpoint você receberá a posição, orientação e campo de visão da
         # câmera virtual. Use esses dados para poder calcular e criar a matriz de projeção
@@ -143,6 +149,7 @@ class GL:
 
     @staticmethod
     def transform_in(translation, scale, rotation):
+        print("transform_in")
         """Função usada para renderizar (na verdade coletar os dados) de Transform."""
         # A função transform_in será chamada quando se entrar em um nó X3D do tipo Transform
         # do grafo de cena. Os valores passados são a escala em um vetor [x, y, z]
@@ -163,7 +170,7 @@ class GL:
 
         # translacao
         translacao = np.eye(4)
-        translacao[:3,3] = translation
+        translacao[:3, 3] = translation
         #print(translacao)
 
         # rotacao
@@ -174,7 +181,7 @@ class GL:
         transformation = np.matmul(translacao, rotacao)
         GL.geometry_transformation = np.matmul(transformation, escala)
         # print(f"transformacao: \n{transformation}")
-
+        GL.pilha.append(GL.geometry_transformation)
         # # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         # print("Transform : ", end='')
         # if translation:
@@ -187,6 +194,7 @@ class GL:
 
     @staticmethod
     def transform_out():
+        print("transform_out")
         """Função usada para renderizar (na verdade coletar os dados) de Transform."""
         # A função transform_out será chamada quando se sair em um nó X3D do tipo Transform do
         # grafo de cena. Não são passados valores, porém quando se sai de um nó transform se
@@ -194,7 +202,8 @@ class GL:
         # pilha implementada.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Saindo de Transform")
+        GL.geometry_transformation = GL.pilha.pop()
+
 
     @staticmethod
     def triangleStripSet(point, stripCount, colors):
@@ -402,19 +411,15 @@ class GL:
                     point.append(coord[i*3 + eixo])
 
         # print(point)
-        
-        for i in colorIndex:
-            if i != -1:
-                # for eixo in range(3):
-                    # point.append(coord[i*3 + eixo])
-                new_colors.append(i)# + eixo])
 
-        # print(new_colors)
-
-        # if sum(colors['emissiveColor']) == 0:
-        #     colors['emissiveColor'] = [1, 1, 0]
-
-        # GL.triangleSet(new_point, colors)
+        if colorPerVertex:
+            for i in colorIndex:
+                if i != -1:
+                    new_colors.append(i)
+        else:
+            for i in texCoordIndex:
+                if i != -1:
+                    new_colors.append(i)
 
         scale_matrix = np.array([
             [(GL.width/2), 0, 0, 0],
@@ -477,47 +482,85 @@ class GL:
 
             # print(lista)
 
-            aliasing = 1
+            aliasing = 4
             rgb_print = []
 
             z0, z1, z2 = [1/vertices[k + i] for i in range(0, 9) if (i + 1) % 3 == 0]
 
-            rgb0 = [color[new_colors[(k//9)*3 + 2]*3 + bolas] for bolas in range(3)]
-            rgb1 = [color[new_colors[(k//9)*3 + 0]*3 + bolas] for bolas in range(3)]
-            rgb2 = [color[new_colors[(k//9)*3 + 1]*3 + bolas] for bolas in range(3)]
+            if colorPerVertex:
+                rgb0 = [color[new_colors[(k//9)*3 + 2]*3 + bolas] for bolas in range(3)]
+                rgb1 = [color[new_colors[(k//9)*3 + 0]*3 + bolas] for bolas in range(3)]
+                rgb2 = [color[new_colors[(k//9)*3 + 1]*3 + bolas] for bolas in range(3)]
 
+                for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
+                    for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
 
-            for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
-                for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
-                    
-                    sumk = 0
-                    rgb = [0, 0, 0]
-                    
-                    for kx in range(aliasing):
-                        for ky in range(aliasing):
-                            
-                            sksk = rotinas.inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
+                        sumk = 0
+                        rgb = [0, 0, 0]
 
-                            if sksk is not None:
-                                alpha, beta, gamma = sksk
+                        for kx in range(aliasing):
+                            for ky in range(aliasing):
 
-                                Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
-                                
-                                rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
-                                rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
-                                rgb[2] += Z_zao*((rgb0[2]*z0*alpha) + (rgb1[2]*z1*beta) + (rgb2[2]*z2*gamma))
+                                sksk = rotinas.inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
 
-                    
-                    rgb[0] *= 255/aliasing
-                    rgb[1] *= 255/aliasing
-                    rgb[2] *= 255/aliasing
-                    
-                    if sum(rgb) > 0:
-                        gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, rgb)
-                        
-            # print(rgb_print)
+                                if sksk is not None:
+                                    alpha, beta, gamma = sksk
 
+                                    Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
 
+                                    rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
+                                    rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
+                                    rgb[2] += Z_zao*((rgb0[2]*z0*alpha) + (rgb1[2]*z1*beta) + (rgb2[2]*z2*gamma))
+
+                        rgb[0] *= 255/aliasing
+                        rgb[1] *= 255/aliasing
+                        rgb[2] *= 255/aliasing
+
+                        if sum(rgb) > 0:
+                            gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, rgb)
+
+            else:
+                image = gpu.GPU.load_texture(current_texture[0])
+                rgb0 = [texCoord[new_colors[(k // 9) * 3 + 0] * 2 + bolas] for bolas in range(2)]
+                rgb1 = [texCoord[new_colors[(k // 9) * 3 + 2] * 2 + bolas] for bolas in range(2)]
+                rgb2 = [texCoord[new_colors[(k // 9) * 3 + 1] * 2 + bolas] for bolas in range(2)]
+                print("texCoord: ", texCoord)
+                print("new_colors: ", new_colors)
+                print("rgb0: ", rgb0)
+                print("rgb1: ", rgb1)
+                print("rgb2: ", rgb2)
+                for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
+                    for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
+
+                        sumk = 0
+                        rgb = [0, 0]
+
+                        for kx in range(aliasing):
+                            for ky in range(aliasing):
+
+                                sksk = rotinas.inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
+
+                                if sksk is not None:
+                                    alpha, beta, gamma = sksk
+
+                                    Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
+
+                                    if sumk == 0:
+                                        rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
+                                        rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
+                                    sumk += 1
+                                    # rgb[2] += Z_zao*((rgb0[2]*z0*alpha) + (rgb1[2]*z1*beta) + (rgb2[2]*z2*gamma))
+                        #
+                        # rgb[0] /= aliasing
+                        # rgb[1] /= aliasing
+                        # rgb[2] *= 255/aliasing
+
+                        if sumk > 0:
+                            pixel = image[int(rgb[0] * image.shape[0]), image.shape[1] - int(rgb[1] * image.shape[1])-1]
+                            sumk = int((aliasing**2)/sumk)
+                            # print(sumk)
+                            pixel //= sumk
+                            gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, pixel[:3])
         # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("IndexedFaceSet : ")
         if coord:
@@ -535,7 +578,6 @@ class GL:
 
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
         gpu.GPU.draw_pixels([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
-
 
     # Para o futuro (Não para versão atual do projeto.)
     def vertex_shader(self, shader):
