@@ -507,16 +507,19 @@ class GL:
                                     alpha, beta, gamma = sksk
 
                                     Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
+                                    sumk += 1
 
                                     rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
                                     rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
                                     rgb[2] += Z_zao*((rgb0[2]*z0*alpha) + (rgb1[2]*z1*beta) + (rgb2[2]*z2*gamma))
 
-                        rgb[0] *= 255/aliasing
-                        rgb[1] *= 255/aliasing
-                        rgb[2] *= 255/aliasing
+                        # rgb[0] *= 255/aliasing
+                        # rgb[1] *= 255/aliasing
+                        # rgb[2] *= 255/aliasing
 
                         if sum(rgb) > 0:
+                            rgb = list(255*np.array(rgb)/(aliasing**2))
+
                             gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, rgb)
 
             else:
