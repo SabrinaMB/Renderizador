@@ -456,7 +456,9 @@ class GL:
 
             triangulo = np.matmul(GL.geometry_transformation, triangulo)
 
-            triangulo = np.matmul(GL.viewpoint_lookat, triangulo) 
+            triangulo = np.matmul(GL.viewpoint_lookat, triangulo)
+            
+            z_s = triangulo[2, :]
 
             triangulo = np.matmul(GL.viewpoint_projecao, triangulo)
 
@@ -464,7 +466,11 @@ class GL:
 
             triangulo = np.matmul(tela, triangulo)
 
-            triangulo = triangulo[0:3,:].flatten('F')
+            triangulo = triangulo[0:3,:]
+
+            triangulo[2, :] = z_s
+
+            triangulo = triangulo.flatten('F')
 
             for coordenada in triangulo:
                 transformed_triangles.append(coordenada)
@@ -528,8 +534,8 @@ class GL:
             else:
                 image = gpu.GPU.load_texture(current_texture[0])
                 rgb0 = [texCoord[new_colors[(k // 9) * 3 + 0] * 2 + bolas] for bolas in range(2)]
-                rgb1 = [texCoord[new_colors[(k // 9) * 3 + 2] * 2 + bolas] for bolas in range(2)]
-                rgb2 = [texCoord[new_colors[(k // 9) * 3 + 1] * 2 + bolas] for bolas in range(2)]
+                rgb1 = [texCoord[new_colors[(k // 9) * 3 + 1] * 2 + bolas] for bolas in range(2)]
+                rgb2 = [texCoord[new_colors[(k // 9) * 3 + 2] * 2 + bolas] for bolas in range(2)]
                 print("texCoord: ", texCoord)
                 print("new_colors: ", new_colors)
                 print("rgb0: ", rgb0)
@@ -547,7 +553,7 @@ class GL:
                                 sksk = rotinas.inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
 
                                 if sksk is not None:
-                                    alpha, beta, gamma = sksk
+                                    gamma, alpha, beta = sksk
 
                                     Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
 
@@ -562,11 +568,11 @@ class GL:
                         # rgb[2] *= 255/aliasing
 
                         if sumk > 0:
-                            pixel = image[int(rgb[0] * image.shape[0]), image.shape[1] - int(rgb[1] * image.shape[1])-1]
+                            pixel = image[image.shape[0] - 1 - int(rgb[1] * image.shape[0]), int(rgb[0] * image.shape[1])]#image.shape[1] - int(rgb[1] * image.shape[1])-1]
                             sumk = int((aliasing**2)/sumk)
                             # print(sumk)
                             pixel //= sumk
-                            gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, pixel[:3])
+                            gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, list(pixel[:3]))
         # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("IndexedFaceSet : ")
         if coord:
