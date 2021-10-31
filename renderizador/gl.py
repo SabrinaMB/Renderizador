@@ -11,7 +11,7 @@ Disciplina: Computação Gráfica
 Data:
 """
 
-from math import tan, atan
+from math import cos, pi, sin, tan, atan
 from PIL.Image import new
 import numpy as np
 import rotinas
@@ -39,10 +39,29 @@ class GL:
         GL.near = near
         GL.far = far
         GL.pilha = []
+        GL.scale_matrix = np.array([
+            [(GL.width/2), 0, 0, 0],
+            [0, (GL.height/2), 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
+
+        GL.translator_matrix = np.array([
+            [1, 0, 0, 1],
+            [0, 1, 0, 1],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
+        
+        GL.mirror_matrix = np.array([
+            [1, 0, 0, 0],
+            [0, -1, 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
 
     @staticmethod
-    def triangleSet(point, colors):
-        print("triangleSet")
+    def triangleSet(point, colors, lights=None):
         """Função usada para renderizar TriangleSet."""
         # Nessa função você receberá pontos no parâmetro point, esses pontos são uma lista
         # de pontos x, y, e z sempre na ordem. Assim point[0] é o valor da coordenada x do
@@ -54,29 +73,11 @@ class GL:
         # triângulo, e assim por diante.
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o TriangleSet
         # você pode assumir o desenho das linhas com a cor emissiva (emissiveColor).
-        scale_matrix = np.array([
-            [(GL.width/2), 0, 0, 0],
-            [0, (GL.height/2), 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1],
-        ])
 
-        translator_matrix = np.array([
-            [1, 0, 0, 1],
-            [0, 1, 0, 1],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1],
-        ])
-        
-        mirror_matrix = np.array([
-            [1, 0, 0, 0],
-            [0, -1, 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1],
-        ])
+        # print("jdinog13i1ofvk efldcm")
 
-        tela = np.matmul(scale_matrix, translator_matrix)
-        tela = np.matmul(tela, mirror_matrix)
+        tela = np.matmul(GL.scale_matrix, GL.translator_matrix)
+        tela = np.matmul(tela, GL.mirror_matrix)
         
         triangles = [np.array([[point[x], point[x + 3], point[x + 6]], [point[x + 1], point[x + 3 + 1], point[x + 6 + 1]], [point[x + 2], point[x + 3 + 2], point[x + 6 + 2]], [1, 1, 1]]) for x in range(0, len(point), 9)]
         
@@ -87,51 +88,47 @@ class GL:
 
         for triangulo in triangles:
 
-            triangulo = np.matmul(matriz_transformacao, triangulo)
+            triangulo = np.matmul(GL.geometry_transformation, triangulo)
 
-            triangulo = np.matmul(GL.viewpoint_lookat, triangulo) 
+            triangulo = np.matmul(GL.viewpoint_lookat, triangulo)
+            
+            z_s = triangulo[2, :]
 
             triangulo = np.matmul(GL.viewpoint_projecao, triangulo)
 
             triangulo = triangulo/triangulo[-1, :]
 
-            triangulo = np.matmul(tela, triangulo)[0:2,:].flatten('F')
+            triangulo = np.matmul(tela, triangulo)
 
-            # print(triangulo)
-            
+            triangulo = triangulo[0:3,:]
+
+            triangulo[2, :] = z_s
+
+            triangulo = triangulo.flatten('F')
+
             for coord in triangulo:
                 transformed_triangles.append(coord)
-        #
-        # if sum(colors['emissiveColor']) == 0:
-        #     colors['emissiveColor'] = [0, 0, 1]
-
-            # rotinas.triangleSet2D(triangulo, colors)
-        # print(transformed_triangles)
-        rotinas.triangleSet2D(transformed_triangles, colors)
+        
+        if lights:
+            # print("nfejinfkdfknwkefl")
+            rotinas.triangleSet3D_lights(transformed_triangles, colors, lights)
+        else:
+            rotinas.triangleSet2D(transformed_triangles, colors)
 
 
     @staticmethod
     def viewpoint(position, orientation, fieldOfView):
-        print("viewpoint")
         """Função usada para renderizar (na verdade coletar os dados) de Viewpoint."""
         # Na função de viewpoint você receberá a posição, orientação e campo de visão da
         # câmera virtual. Use esses dados para poder calcular e criar a matriz de projeção
         # perspectiva para poder aplicar nos pontos dos objetos geométricos.
 
-        # position = [-8, 1, 1]
-        # orientation = [0, 1, 0, -1.57]
-
-        # translacao
         translacao = np.eye(4)
         translacao[:3,3] = -np.array(position)
-        #print(translacao)
 
-        # rotacao
         rotacao = rotation_matrix.rotation_matrix(orientation).T
-        #print(rotacao)
 
         GL.viewpoint_lookat = np.matmul(rotacao, translacao)
-        #print(transformation)
 
         fovy = 2*atan(tan(fieldOfView/2)*(GL.height/(((GL.height**2) + (GL.width**2))**0.5)))
         top = GL.near * tan(fovy)
@@ -144,15 +141,8 @@ class GL:
             [0, 0, -1, 0],
         ])
 
-        # # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("Viewpoint : ", end='')
-        # print("position = {0} ".format(position), end='')
-        # print("orientation = {0} ".format(orientation), end='')
-        # print("fieldOfView = {0} ".format(fieldOfView))
-
     @staticmethod
     def transform_in(translation, scale, rotation):
-        print("transform_in")
         """Função usada para renderizar (na verdade coletar os dados) de Transform."""
         # A função transform_in será chamada quando se entrar em um nó X3D do tipo Transform
         # do grafo de cena. Os valores passados são a escala em um vetor [x, y, z]
@@ -162,42 +152,21 @@ class GL:
         # Quando se entrar em um nó transform se deverá salvar a matriz de transformação dos
         # modelos do mundo em alguma estrutura de pilha.
 
-
-        # translation = [2, 1, 1]
-        # scale = [1, 3, 2]
-        # rotation = [1, 0, 0, -1.57]
-
         # escala
         escala = np.diag([scale[x] if (x < 3) else 1 for x in range(4)])
-        #print(escala)
 
-        # translacao
         translacao = np.eye(4)
         translacao[:3, 3] = translation
-        #print(translacao)
 
-        # rotacao
         rotacao = rotation_matrix.rotation_matrix(rotation)
-        #print(rotacao)
 
-        # translacao x rotacao x escala
         transformation = np.matmul(translacao, rotacao)
+        
         GL.geometry_transformation = np.matmul(transformation, escala)
-        # print(f"transformacao: \n{transformation}")
         GL.pilha.append(GL.geometry_transformation)
-        # # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("Transform : ", end='')
-        # if translation:
-        #     print("translation = {0} ".format(translation), end='') # imprime no terminal
-        # if scale:
-        #     print("scale = {0} ".format(scale), end='') # imprime no terminal
-        # if rotation:
-        #     print("rotation = {0} ".format(rotation), end='') # imprime no terminal
-        # print("")
 
     @staticmethod
     def transform_out():
-        print("transform_out")
         """Função usada para renderizar (na verdade coletar os dados) de Transform."""
         # A função transform_out será chamada quando se sair em um nó X3D do tipo Transform do
         # grafo de cena. Não são passados valores, porém quando se sai de um nó transform se
@@ -209,7 +178,7 @@ class GL:
 
 
     @staticmethod
-    def triangleStripSet(point, stripCount, colors):
+    def triangleStripSet(point, stripCount, colors, lights=None):
         """Função usada para renderizar TriangleStripSet."""
         # A função triangleStripSet é usada para desenhar tiras de triângulos interconectados,
         # você receberá as coordenadas dos pontos no parâmetro point, esses pontos são uma
@@ -221,8 +190,6 @@ class GL:
         # primeiro triângulo será com os vértices 0, 1 e 2, depois serão os vértices 1, 2 e 3,
         # depois 2, 3 e 4, e assim por diante. Cuidado com a orientação dos vértices, ou seja,
         # todos no sentido horário ou todos no sentido anti-horário, conforme especificado.
-
-        ################### THIS WORKS
 
         new_point = []
 
@@ -241,27 +208,13 @@ class GL:
         for x in range(3):
             new_point.append(point[len(point) - 9 + x])
 
-        #colors['emissiveColor'] = [0, 1, 0]
-
-        GL.triangleSet(new_point, colors)
-
-        ################### THIS WORKS
-
-        
-        
-
-        # # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("TriangleStripSet : pontos = {0} ".format(point), end='')
-        # for i, strip in enumerate(stripCount):
-        #     print("strip[{0}] = {1} ".format(i, strip), end='')
-        # print("")
-        # print("TriangleStripSet : colors = {0}".format(colors)) # imprime no terminal as cores
-
-        # # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        # gpu.GPU.draw_pixels([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+        GL.triangleSet(new_point, colors, lights)
 
     @staticmethod
     def indexedTriangleStripSet(point, index, colors):
+        
+        # print("\n"*10 + "DEBUG" + "\n"*10)
+
         """Função usada para renderizar IndexedTriangleStripSet."""
         # A função indexedTriangleStripSet é usada para desenhar tiras de triângulos
         # interconectados, você receberá as coordenadas dos pontos no parâmetro point, esses
@@ -274,8 +227,6 @@ class GL:
         # primeiro triângulo será com os vértices 0, 1 e 2, depois serão os vértices 1, 2 e 3,
         # depois 2, 3 e 4, e assim por diante. Cuidado com a orientação dos vértices, ou seja,
         # todos no sentido horário ou todos no sentido anti-horário, conforme especificado.
-
-        ################### THIS WORKS
 
         new_point = []
 
@@ -300,15 +251,6 @@ class GL:
 
         GL.triangleSet(new_point, colors)
 
-        ################### THIS WORKS
-
-        # # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("IndexedTriangleStripSet : pontos = {0}, index = {1}".format(point, index))
-        # print("IndexedTriangleStripSet : colors = {0}".format(colors)) # imprime as cores
-
-        # # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        # gpu.GPU.draw_pixels([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
-
     @staticmethod
     def box(size, colors):
         """Função usada para renderizar Boxes."""
@@ -319,9 +261,6 @@ class GL:
         # essa caixa você vai provavelmente querer tesselar ela em triângulos, para isso
         # encontre os vértices e defina os triângulos.
 
-
-        # size = [4, 1, 4]
-
         top = []
         bottom = []
 
@@ -329,7 +268,7 @@ class GL:
             for x in [0,1]:
                 for z in [0,1]:
                     lista = [size[0]*x, size[1]*y, size[2]*z]
-                    # print(lista)
+
                     for item in lista:
                         if y == 1:
                             top.append(item)
@@ -342,11 +281,6 @@ class GL:
 
         GL.triangleStripSet(top, [len(top)], colors)
         GL.triangleStripSet(bottom, [len(bottom)], colors)
-
-        ############### THIS TOOO
-
-
-        ############### THIS WORKS
 
         coords = []
         for z in range(2):
@@ -367,20 +301,9 @@ class GL:
         
         for i in range(3):
             coords.append(coords[i])
-
-        for i in range(0, len(coords), 3):
-            print(coords[i:i + 3])
         
         GL.triangleStripSet(coords, [len(coords)], colors)
 
-        ############### THIS WORKS
-
-        # # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("Box : size = {0}".format(size)) # imprime no terminal pontos
-        # print("Box : colors = {0}".format(colors)) # imprime no terminal as cores
-
-        # # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        # gpu.GPU.draw_pixels([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
 
     @staticmethod
     def indexedFaceSet(coord, coordIndex, colorPerVertex, color, colorIndex,
@@ -405,6 +328,8 @@ class GL:
         # cor da textura conforme a posição do mapeamento. Dentro da classe GPU já está
         # implementadado um método para a leitura de imagens.
 
+        # print("niroafksdnfasdlkjgnzsdk flxcn,gkjzn,rm gdkjfvs.e,nmdfjkwanlsc,d")
+
         point = []
         new_colors = []
 
@@ -412,8 +337,6 @@ class GL:
             if i != -1:
                 for eixo in range(3):
                     point.append(coord[i*3 + eixo])
-
-        # print(point)
 
         if colorPerVertex:
             for i in colorIndex:
@@ -424,32 +347,12 @@ class GL:
                 if i != -1:
                     new_colors.append(i)
 
-        scale_matrix = np.array([
-            [(GL.width/2), 0, 0, 0],
-            [0, (GL.height/2), 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1],
-        ])
 
-        translator_matrix = np.array([
-            [1, 0, 0, 1],
-            [0, 1, 0, 1],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1],
-        ])
-        
-        mirror_matrix = np.array([
-            [1, 0, 0, 0],
-            [0, -1, 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1],
-        ])
-
-        tela = np.matmul(scale_matrix, translator_matrix)
-        tela = np.matmul(tela, mirror_matrix)
+        tela = np.matmul(GL.scale_matrix, GL.translator_matrix)
+        tela = np.matmul(tela, GL.mirror_matrix)
         
         triangles = [np.array([[point[x], point[x + 3], point[x + 6]], [point[x + 1], point[x + 3 + 1], point[x + 6 + 1]], [point[x + 2], point[x + 3 + 2], point[x + 6 + 2]], [1, 1, 1]]) for x in range(0, len(point), 9)]
-        # print(triangles)
+
         transformed_triangles = []
 
         for triangulo in triangles:
@@ -475,121 +378,15 @@ class GL:
             for coordenada in triangulo:
                 transformed_triangles.append(coordenada)
 
-        # if sum(colors['emissiveColor']) == 0:
-        #     colors['emissiveColor'] = [0, 0, 1]
-
         vertices = transformed_triangles
 
-        for k in range(0, len(vertices), 9):
+        if texCoordIndex:
+            rotinas.triangleSet3D_tex(vertices, new_colors, current_texture, texCoord)
+        elif colorPerVertex:
+            rotinas.triangleSet3D_color(vertices, color, new_colors)
+        else:
+            rotinas.triangleSet3D_white(vertices)
 
-            lista = [vertices[k + i] for i in range(0, 9) if (i + 1) % 3 != 0]
-            x_1, y_1, x_2, y_2, x_3, y_3 = lista
-            minX = min([lista[i*2] for i in range(3)])
-            maxX = max([lista[i*2] for i in range(3)])
-            minY = min([lista[1 + i*2] for i in range(3)])
-            maxY = max([lista[1 + i*2] for i in range(3)])
-
-            # print(lista)
-
-            aliasing = 4
-            rgb_print = []
-
-            z0, z1, z2 = [1/vertices[k + i] for i in range(0, 9) if (i + 1) % 3 == 0]
-
-            if colorPerVertex:
-                rgb0 = [color[new_colors[(k//9)*3 + 2]*3 + bolas] for bolas in range(3)]
-                rgb1 = [color[new_colors[(k//9)*3 + 0]*3 + bolas] for bolas in range(3)]
-                rgb2 = [color[new_colors[(k//9)*3 + 1]*3 + bolas] for bolas in range(3)]
-
-                for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
-                    for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
-
-                        sumk = 0
-                        rgb = [0, 0, 0]
-
-                        for kx in range(aliasing):
-                            for ky in range(aliasing):
-
-                                sksk = rotinas.inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
-
-                                if sksk is not None:
-                                    alpha, beta, gamma = sksk
-
-                                    Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
-                                    sumk += 1
-
-                                    rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
-                                    rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
-                                    rgb[2] += Z_zao*((rgb0[2]*z0*alpha) + (rgb1[2]*z1*beta) + (rgb2[2]*z2*gamma))
-
-                        # rgb[0] *= 255/aliasing
-                        # rgb[1] *= 255/aliasing
-                        # rgb[2] *= 255/aliasing
-
-                        if sum(rgb) > 0:
-                            rgb = list(255*np.array(rgb)/(aliasing**2))
-
-                            gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, rgb)
-
-            else:
-                image = gpu.GPU.load_texture(current_texture[0])
-                rgb0 = [texCoord[new_colors[(k // 9) * 3 + 0] * 2 + bolas] for bolas in range(2)]
-                rgb1 = [texCoord[new_colors[(k // 9) * 3 + 1] * 2 + bolas] for bolas in range(2)]
-                rgb2 = [texCoord[new_colors[(k // 9) * 3 + 2] * 2 + bolas] for bolas in range(2)]
-                print("texCoord: ", texCoord)
-                print("new_colors: ", new_colors)
-                print("rgb0: ", rgb0)
-                print("rgb1: ", rgb1)
-                print("rgb2: ", rgb2)
-                for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
-                    for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
-
-                        sumk = 0
-                        rgb = [0, 0]
-
-                        for kx in range(aliasing):
-                            for ky in range(aliasing):
-
-                                sksk = rotinas.inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
-
-                                if sksk is not None:
-                                    gamma, alpha, beta = sksk
-
-                                    Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
-
-                                    if sumk == 0:
-                                        rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
-                                        rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
-                                    sumk += 1
-                                    # rgb[2] += Z_zao*((rgb0[2]*z0*alpha) + (rgb1[2]*z1*beta) + (rgb2[2]*z2*gamma))
-                        #
-                        # rgb[0] /= aliasing
-                        # rgb[1] /= aliasing
-                        # rgb[2] *= 255/aliasing
-
-                        if sumk > 0:
-                            pixel = image[image.shape[0] - 1 - int(rgb[1] * image.shape[0]), int(rgb[0] * image.shape[1])]#image.shape[1] - int(rgb[1] * image.shape[1])-1]
-                            sumk = int((aliasing**2)/sumk)
-                            # print(sumk)
-                            pixel //= sumk
-                            gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, list(pixel[:3]))
-        # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("IndexedFaceSet : ")
-        if coord:
-            print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
-        print("colorPerVertex = {0}".format(colorPerVertex))
-        if colorPerVertex and color and colorIndex:
-            print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
-        if texCoord and texCoordIndex:
-            print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
-        if current_texture:
-            image = gpu.GPU.load_texture(current_texture[0])
-            print("\t Matriz com image = {0}".format(image))
-            print("\t Dimensões da image = {0}".format(image.shape))
-        print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
-
-        # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixels([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
 
     @staticmethod
     def sphere(radius, colors):
@@ -601,8 +398,39 @@ class GL:
         # os triângulos.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Sphere : radius = {0}".format(radius)) # imprime no terminal o raio da esfera
-        print("Sphere : colors = {0}".format(colors)) # imprime no terminal as cores
+
+        # radius *= 2
+
+        long_size = 8
+        longitudes = [(theta/long_size)*pi for theta in range(0, 2*(long_size) + 1, 1)]
+
+        lat_size = 3
+        latitudes = [(bizarrao/lat_size)*pi/2 for bizarrao in range(-lat_size, lat_size + 1, 1)]
+
+        # colors["normal"] = rotinas.normal()
+
+        print(colors)
+        print(GL.lighting)
+
+
+        for n in range(len(latitudes) - 1):
+            
+            pontos = []
+
+            for j in range(len(longitudes)):
+                for next_n in range(0, 2):
+                    theta, bizarrao = [longitudes[j], latitudes[n + next_n]]
+                    x = radius*sin(bizarrao)*cos(theta)
+                    y = radius*sin(bizarrao)*sin(theta)
+                    z = radius*cos(bizarrao)
+
+                    pontos.append(x)
+                    pontos.append(y)
+                    pontos.append(z)
+
+            pontos += pontos[:3]
+            
+            GL.triangleStripSet(pontos, 0, colors, GL.lighting)
 
     @staticmethod
     def navigationInfo(headlight):
@@ -626,10 +454,16 @@ class GL:
         # longo de raios paralelos de uma distância infinita.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("DirectionalLight : ambientIntensity = {0}".format(ambientIntensity))
-        print("DirectionalLight : color = {0}".format(color)) # imprime no terminal
-        print("DirectionalLight : intensity = {0}".format(intensity)) # imprime no terminal
-        print("DirectionalLight : direction = {0}".format(direction)) # imprime no terminal
+        GL.lighting = {
+            "ambientIntensity" : ambientIntensity,
+            "color" : color,
+            "intensity" : intensity,
+            "direction" : direction
+        }
+        # print("DirectionalLight : ambientIntensity = {0}".format(ambientIntensity))
+        # print("DirectionalLight : color = {0}".format(color)) # imprime no terminal
+        # print("DirectionalLight : intensity = {0}".format(intensity)) # imprime no terminal
+        # print("DirectionalLight : direction = {0}".format(direction)) # imprime no terminal
 
     @staticmethod
     def pointLight(ambientIntensity, color, intensity, location):
