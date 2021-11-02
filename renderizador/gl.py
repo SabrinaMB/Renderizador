@@ -39,6 +39,7 @@ class GL:
         GL.near = near
         GL.far = far
         GL.pilha = []
+        GL.anim_key = 0
         GL.scale_matrix = np.array([
             [(GL.width/2), 0, 0, 0],
             [0, (GL.height/2), 0, 0],
@@ -59,6 +60,15 @@ class GL:
             [0, 0, 1, 0],
             [0, 0, 0, 1],
         ])
+
+        GL.catmull_rom = np.array([
+        [-1/2, 3/2, -3/2, 1/2],
+        [1, -5/2, 2, -1/2],
+        [-1/2, 0, 1/2, 0],
+        [0, 1, 0, 0]
+        ])
+
+        GL.value_changed = None
 
     @staticmethod
     def triangleSet(point, colors, lights=None):
@@ -382,7 +392,9 @@ class GL:
 
         if texCoordIndex:
             rotinas.triangleSet3D_tex(vertices, new_colors, current_texture, texCoord)
-        elif colorPerVertex:
+        elif (colorPerVertex and color):
+            print(color)
+            print(new_colors)
             rotinas.triangleSet3D_color(vertices, color, new_colors)
         else:
             rotinas.triangleSet3D_white(vertices)
@@ -399,19 +411,21 @@ class GL:
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
 
-        # radius *= 2
+        radius *= 1
 
-        long_size = 8
-        longitudes = [(theta/long_size)*pi for theta in range(0, 2*(long_size) + 1, 1)]
+        long_size = 24
+        longitudes = [(theta/long_size)*pi for theta in range(0, (2*long_size) + 1, 1)]
 
-        lat_size = 3
+        lat_size = 24
         latitudes = [(bizarrao/lat_size)*pi/2 for bizarrao in range(-lat_size, lat_size + 1, 1)]
 
-        # colors["normal"] = rotinas.normal()
+        direcao = np.array(GL.lighting["direction"] + [1])
 
-        print(colors)
-        print(GL.lighting)
+        direcao = np.array(direcao)
 
+        direcao = np.reshape(direcao, (-1, 1))
+
+        direcao = np.reshape(direcao, (-1))[:-1]
 
         for n in range(len(latitudes) - 1):
             
@@ -429,8 +443,11 @@ class GL:
                     pontos.append(z)
 
             pontos += pontos[:3]
+
+            fix = GL.lighting.copy()
+            fix["direction"] = direcao
             
-            GL.triangleStripSet(pontos, 0, colors, GL.lighting)
+            GL.triangleStripSet(pontos, 0, colors, fix)
 
     @staticmethod
     def navigationInfo(headlight):
@@ -521,23 +538,36 @@ class GL:
     @staticmethod
     def splinePositionInterpolator(set_fraction, key, keyValue, closed):
         """Interpola não linearmente entre uma lista de vetores 3D."""
-        # Interpola não linearmente entre uma lista de vetores 3D. O campo keyValue possui
-        # uma lista com os valores a serem interpolados, key possui uma lista respectiva de chaves
-        # dos valores em keyValue, a fração a ser interpolada vem de set_fraction que varia de
-        # zeroa a um. O campo keyValue deve conter exatamente tantos vetores 3D quanto os
-        # quadros-chave no key. O campo closed especifica se o interpolador deve tratar a malha
-        # como fechada, com uma transições da última chave para a primeira chave. Se os keyValues
-        # na primeira e na última chave não forem idênticos, o campo closed será ignorado.
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("SplinePositionInterpolator : set_fraction = {0}".format(set_fraction))
-        print("SplinePositionInterpolator : key = {0}".format(key)) # imprime no terminal
-        print("SplinePositionInterpolator : keyValue = {0}".format(keyValue))
-        print("SplinePositionInterpolator : closed = {0}".format(closed))
+        if (key[(GL.anim_key + 1)] < set_fraction):
+            GL.anim_key = (GL.anim_key + 1)
 
-        # Abaixo está só um exemplo de como os dados podem ser calculados e transferidos
-        value_changed = [0.0, 0.0, 0.0]
+        if closed:
+            if ((GL.anim_key == len(key) - 2) and (key[GL.anim_key] > set_fraction)):
+                GL.anim_key = 0
+
+        px = []
+        py = []
+        pz = []
+
+        for k in range(4):
+            idx = (((GL.anim_key + k)%len(key))*3)
+            px += [keyValue[idx]]
+            py += [keyValue[idx + 1]]
+            pz += [keyValue[idx + 2]]
+
+        tzinho = (set_fraction - key[GL.anim_key])/0.2
+        t = np.array([(tzinho**p) for p in range(0, 4)])
+        t = np.flip(t, 0)
         
+        resultado = np.matmul(t, GL.catmull_rom)
+
+        resultadox = np.matmul(resultado, px)
+        resultadoy = np.matmul(resultado, py)
+        resultadoz = np.matmul(resultado, pz)
+
+        value_changed = [resultadox, resultadoy, resultadoz]
+
         return value_changed
 
     @staticmethod

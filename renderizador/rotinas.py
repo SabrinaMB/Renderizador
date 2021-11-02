@@ -12,6 +12,8 @@ Data:
 import gpu          # Simula os recursos de uma GPU
 import numpy as np
 
+# from renderizador.x3d import Color
+
 #################################################################################
 # NÃO USAR MAIS ESSE ARQUIVO. AS ROTINAS DEVEM SER IMPLEMENTADAS AGORA NO gl.GL #
 #################################################################################
@@ -32,7 +34,6 @@ def polypoint2D(point, colors):
     # você pode assumir o desenho dos pontos com a cor emissiva (emissiveColor).
 
     # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
-
 
 # web3d.org/documents/specifications/19775-1/V3.0/Part01/components/geometry2D.html#Polyline2D
 def polyline2D(lineSegments, colors):
@@ -116,15 +117,25 @@ def polyline2D(lineSegments, colors):
 def ambient(lights, surface):
     return lights["ambientIntensity"] * np.array(surface["diffuseColor"]) * 0.2#surface["shininess"]
 
+def normalize(vector):
+    vector = np.array(vector)
+
+    if np.linalg.norm(vector) == 0:
+        return np.array([0,0,0])
+    
+    return vector/np.linalg.norm(vector)
+
+def magnitude(vector):
+    return np.linalg.norm(vector)
+
 def dot_3d(vec1, vec2):
     vec1 = np.array(vec1)
-    # vec1 = vec1/np.linalg.norm(vec1)
+    # vec1 = normalize(vec1)
     
     vec2 = np.array(vec2)
-    # vec2 = vec2/np.linalg.norm(vec2)
+    # vec2 = normalize(vec2)
 
-    x = abs(np.dot(vec1, vec2))
-    # x = np.dot(vec1, vec2)
+    x = np.dot(vec1, vec2)
 
     return x
 
@@ -132,34 +143,39 @@ def normal(surface):
     ponto1 = np.array(surface[:3])
     ponto2 = np.array(surface[3:6])
     ponto3 = np.array(surface[6:])
-    vec1 = ponto3 - ponto1
-    vec2 = ponto2 - ponto1
+    vec1 = ponto2 - ponto3
+    vec2 = ponto1 - ponto3
 
-    result = np.cross(np.array(vec1), np.array(vec2))
-    if  np.linalg.norm(result) == 0:
-        return 0
-    return np.divide(result, np.linalg.norm(result))
+    result = np.cross(normalize(vec2), normalize(vec1))
+    media = (ponto1 + ponto2 + ponto3)/3
+    
+    return result, normalize(media)
 
 def diffuse(lights, surface):
-    return lights["intensity"] * np.array(surface["diffuseColor"]) * dot_3d(surface["normal"], lights["direction"])
+    return lights["intensity"] * np.array(surface["diffuseColor"]) * dot_3d(lights["direction"], surface["normal"])
 
 def specular(lights, surface):
-    L_v = np.array([0, 0, 1]) + np.array(lights["direction"]) 
-    # L = 
-    L_v = (L_v / np.linalg.norm(L_v))
-    return lights["intensity"] * np.array(surface["specularColor"]) * (dot_3d(surface["normal"], L_v) ** (surface["shininess"]*128))
+    L_v = normalize(np.array(lights["direction"]) + surface["v"])
+    
+    doty = dot_3d(L_v, normalize(surface["normal"]))
+
+    spec = np.array(surface["specularColor"])
+
+    result = lights["intensity"] * spec * (abs(doty) ** (surface["shininess"]*128))
+
+    return result
 
 def irgb(surface, lights, print_f):
-    Oergb = np.array(np.array(surface["emissiveColor"]))
+    Oergb = np.array(surface["emissiveColor"])
     ambient_i = ambient(lights, surface)
     diffuse_i = diffuse(lights, surface)
     specular_i = specular(lights, surface)
     Ilrgb = np.array(lights["color"])
 
-    result = Oergb + (Ilrgb*(ambient_i + diffuse_i + specular_i))
+    result = Oergb + (Ilrgb * (ambient_i + diffuse_i + specular_i))
 
-    if False:#print_f:
-        print("-"*200)
+    if print_f == 2:
+        print("-"*100)
         print(f"surface : {surface}")
         print(f"lights : {lights}")
         print(f"Oergb = {Oergb}")
@@ -170,10 +186,9 @@ def irgb(surface, lights, print_f):
         print(f"Ilrgb = {Ilrgb}")
         print(f"(Ilrgb*(ambient_i + diffuse_i + specular_i) = {(Ilrgb*(ambient_i + diffuse_i + specular_i))}")
         print(f"result = {result}")
-        print("-"*200)
+        print("-"*100)
 
     return result
-    # return  + sum(np.array(lights["color"])*(ambient(lights, surface) + diffuse(lights, surface) + specular(lights, surface))))
 
 def dot(x_A, y_A, x_B, y_B, x_ponto, y_ponto):
     return (y_B - y_A)*x_ponto - (x_B - x_A)*y_ponto + (x_B - x_A)*y_A - (y_B - y_A)*x_A
@@ -242,17 +257,14 @@ def triangleSet3D_lights(vertices, material, lights, aliasing=4):
         minY = min([lista[1 + i*2] for i in range(3)])
         maxY = max([lista[1 + i*2] for i in range(3)])
 
-        material["normal"] = normal(vertices[k:k + 9])
+        material["normal"], material["v"] = normal(vertices[k:k + 9])
 
         aliasing = 1
-        print_f = False
-
+        print_f = 0
 
         
         for x in range(round(minX), round(maxX) + 1, 1):
             for y in range(round(minY), round(maxY) + 1, 1):
-        # for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
-        #     for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
 
                 sumk = 0
 
@@ -270,12 +282,17 @@ def triangleSet3D_lights(vertices, material, lights, aliasing=4):
                     
                     sumk = (aliasing**2)/sumk
 
-                    if print_f:
-                        print(pixel)
-                        print(sumk)
-                        print_f = False
                     pixel = np.around(pixel/sumk)
-                    gpu.GPU.draw_pixels([x, y], gpu.GPU.RGB8, list(pixel[:3]))
+
+                    if print_f >= 1:
+                        print(pixel)
+                        # print(material["diffuseColor"])
+                        # print(material["diffuseColor"])
+                        # print(sumk)
+                        print_f = False
+                        
+                    pixel = np.clip(pixel, 0, 255)
+                    gpu.GPU.draw_pixels([x, y], gpu.GPU.RGB8, list(pixel))
 
 def triangleSet3D_white(vertices, aliasing=4):
     for k in range(0, len(vertices), 9):
