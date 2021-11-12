@@ -26,10 +26,7 @@ class GL:
     height = 600  # altura da tela
     near = 0.01   # plano de corte próximo
     far = 1000    # plano de corte distante
-    pilha = []
-
-    # def __init__(self):
-    #     self.
+    # pilha = []
 
     @staticmethod
     def setup(width, height, near=0.01, far=1000):
@@ -40,6 +37,7 @@ class GL:
         GL.far = far
         GL.pilha = []
         GL.anim_key = 0
+        GL.pixel_buffer = np.zeros((GL.width,GL.height, 3))
         GL.scale_matrix = np.array([
             [(GL.width/2), 0, 0, 0],
             [0, (GL.height/2), 0, 0],
@@ -69,22 +67,16 @@ class GL:
         ])
 
         GL.value_changed = None
+    
+    @staticmethod
+    def draw_buffer():
+        for x in range(GL.width):
+            for y in range(GL.height):
+                gpu.GPU.draw_pixels([x, y], gpu.GPU.RGB8, list(GL.pixel_buffer[x][y]))
 
     @staticmethod
     def triangleSet(point, colors, lights=None):
         """Função usada para renderizar TriangleSet."""
-        # Nessa função você receberá pontos no parâmetro point, esses pontos são uma lista
-        # de pontos x, y, e z sempre na ordem. Assim point[0] é o valor da coordenada x do
-        # primeiro ponto, point[1] o valor y do primeiro ponto, point[2] o valor z da
-        # coordenada z do primeiro ponto. Já point[3] é a coordenada x do segundo ponto e
-        # assim por diante.
-        # No TriangleSet os triângulos são informados individualmente, assim os três
-        # primeiros pontos definem um triângulo, os três próximos pontos definem um novo
-        # triângulo, e assim por diante.
-        # O parâmetro colors é um dicionário com os tipos cores possíveis, para o TriangleSet
-        # você pode assumir o desenho das linhas com a cor emissiva (emissiveColor).
-
-        # print("jdinog13i1ofvk efldcm")
 
         tela = np.matmul(GL.scale_matrix, GL.translator_matrix)
         tela = np.matmul(tela, GL.mirror_matrix)
@@ -98,7 +90,7 @@ class GL:
 
         for triangulo in triangles:
 
-            triangulo = np.matmul(GL.geometry_transformation, triangulo)
+            triangulo = np.matmul(matriz_transformacao, triangulo)
 
             triangulo = np.matmul(GL.viewpoint_lookat, triangulo)
             
@@ -120,10 +112,17 @@ class GL:
                 transformed_triangles.append(coord)
         
         if lights:
-            # print("nfejinfkdfknwkefl")
-            rotinas.triangleSet3D_lights(transformed_triangles, colors, lights)
+            rotinas.triangleSet3D_lights(transformed_triangles, colors, lights, GL.pixel_buffer)
         else:
-            rotinas.triangleSet2D(transformed_triangles, colors)
+            a = []
+            b = []
+            for i in range(int(len(transformed_triangles)/3)):
+                a += colors["diffuseColor"]
+                b += [i]
+
+            rotinas.triangleSet3D_color(transformed_triangles, a, b, GL.pixel_buffer)
+
+        GL.draw_buffer()
 
 
     @staticmethod
@@ -166,6 +165,7 @@ class GL:
         escala = np.diag([scale[x] if (x < 3) else 1 for x in range(4)])
 
         translacao = np.eye(4)
+
         translacao[:3, 3] = translation
 
         rotacao = rotation_matrix.rotation_matrix(rotation)
@@ -173,6 +173,7 @@ class GL:
         transformation = np.matmul(translacao, rotacao)
         
         GL.geometry_transformation = np.matmul(transformation, escala)
+
         GL.pilha.append(GL.geometry_transformation)
 
     @staticmethod
@@ -289,8 +290,9 @@ class GL:
             top.append(top[i])
             bottom.append(bottom[i])
 
-        GL.triangleStripSet(top, [len(top)], colors)
         GL.triangleStripSet(bottom, [len(bottom)], colors)
+
+        GL.triangleStripSet(top, [len(top)], colors)
 
         coords = []
         for z in range(2):
@@ -391,41 +393,30 @@ class GL:
         vertices = transformed_triangles
 
         if texCoordIndex:
-            rotinas.triangleSet3D_tex(vertices, new_colors, current_texture, texCoord)
+            rotinas.triangleSet3D_tex(vertices, new_colors, current_texture, texCoord, GL.pixel_buffer)
         elif (colorPerVertex and color):
-            print(color)
-            print(new_colors)
-            rotinas.triangleSet3D_color(vertices, color, new_colors)
+            rotinas.triangleSet3D_color(vertices, color, new_colors, GL.pixel_buffer)
         else:
-            rotinas.triangleSet3D_white(vertices)
+            rotinas.triangleSet3D_white(vertices, GL.pixel_buffer)
+
+        GL.draw_buffer()
 
 
     @staticmethod
     def sphere(radius, colors):
         """Função usada para renderizar Esferas."""
-        # A função sphere é usada para desenhar esferas na cena. O esfera é centrada no
-        # (0, 0, 0) no sistema de coordenadas local. O argumento radius especifica o
-        # raio da esfera que está sendo criada. Para desenha essa esfera você vai
-        # precisar tesselar ela em triângulos, para isso encontre os vértices e defina
-        # os triângulos.
-
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
 
         radius *= 1
 
-        long_size = 24
+        long_size = 6
         longitudes = [(theta/long_size)*pi for theta in range(0, (2*long_size) + 1, 1)]
 
-        lat_size = 24
+        lat_size = 6
         latitudes = [(bizarrao/lat_size)*pi/2 for bizarrao in range(-lat_size, lat_size + 1, 1)]
 
-        direcao = np.array(GL.lighting["direction"] + [1])
-
-        direcao = np.array(direcao)
-
-        direcao = np.reshape(direcao, (-1, 1))
-
-        direcao = np.reshape(direcao, (-1))[:-1]
+        fix = GL.lighting.copy()
+        # print(fix)
+        fix["direction"] = [-0.5, 0.5, -0.5]
 
         for n in range(len(latitudes) - 1):
             
@@ -443,11 +434,10 @@ class GL:
                     pontos.append(z)
 
             pontos += pontos[:3]
-
-            fix = GL.lighting.copy()
-            fix["direction"] = direcao
             
-            GL.triangleStripSet(pontos, 0, colors, fix)
+            GL.triangleStripSet(pontos, 0, colors, lights=fix)
+        
+
 
     @staticmethod
     def navigationInfo(headlight):
@@ -526,8 +516,8 @@ class GL:
         # Deve retornar a fração de tempo passada em fraction_changed
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("TimeSensor : cycleInterval = {0}".format(cycleInterval)) # imprime no terminal
-        print("TimeSensor : loop = {0}".format(loop))
+        # print("TimeSensor : cycleInterval = {0}".format(cycleInterval)) # imprime no terminal
+        # print("TimeSensor : loop = {0}".format(loop))
 
         # Esse método já está implementado para os alunos como exemplo
         epoch = time.time()  # time in seconds since the epoch as a floating point number.
@@ -539,19 +529,22 @@ class GL:
     def splinePositionInterpolator(set_fraction, key, keyValue, closed):
         """Interpola não linearmente entre uma lista de vetores 3D."""
 
-        if (key[(GL.anim_key + 1)] < set_fraction):
+        GL.pixel_buffer = np.zeros((GL.width,GL.height, 3))
+
+        while (key[GL.anim_key + 1] < set_fraction):
             GL.anim_key = (GL.anim_key + 1)
 
-        if closed:
-            if ((GL.anim_key == len(key) - 2) and (key[GL.anim_key] > set_fraction)):
-                GL.anim_key = 0
+        if (closed == True):
+            if (GL.anim_key == len(key) - 2):
+                if (set_fraction < 0.05):
+                    GL.anim_key = 0
 
         px = []
         py = []
         pz = []
 
         for k in range(4):
-            idx = (((GL.anim_key + k)%len(key))*3)
+            idx = (((GL.anim_key + k)%(len(key) - 1))*3)
             px += [keyValue[idx]]
             py += [keyValue[idx + 1]]
             pz += [keyValue[idx + 2]]

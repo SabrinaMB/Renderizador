@@ -130,10 +130,7 @@ def magnitude(vector):
 
 def dot_3d(vec1, vec2):
     vec1 = np.array(vec1)
-    # vec1 = normalize(vec1)
-    
     vec2 = np.array(vec2)
-    # vec2 = normalize(vec2)
 
     x = np.dot(vec1, vec2)
 
@@ -149,21 +146,22 @@ def normal(surface):
     result = np.cross(normalize(vec2), normalize(vec1))
     media = (ponto1 + ponto2 + ponto3)/3
     
-    return result, normalize(media)
+    return normalize(result), normalize(media)
 
 def diffuse(lights, surface):
-    return lights["intensity"] * np.array(surface["diffuseColor"]) * dot_3d(lights["direction"], surface["normal"])
+    return lights["intensity"] * np.array(surface["diffuseColor"]) * dot_3d(normalize(np.array(lights["direction"])), normalize(surface["normal"]))
 
 def specular(lights, surface):
-    L_v = normalize(np.array(lights["direction"]) + surface["v"])
+    
+    L_v = normalize(normalize(np.array(lights["direction"])) + normalize(surface["v"]))
     
     doty = dot_3d(L_v, normalize(surface["normal"]))
 
     spec = np.array(surface["specularColor"])
 
-    result = lights["intensity"] * spec * (abs(doty) ** (surface["shininess"]*128))
+    result = lights["intensity"] * spec * (abs(doty) ** (surface["shininess"]*64))
 
-    return result
+    return result**(1/(surface["shininess"]*32))
 
 def irgb(surface, lights, print_f):
     Oergb = np.array(surface["emissiveColor"])
@@ -213,6 +211,33 @@ def inside_fuq(x_A, y_A, x_B, y_B, x_C, y_C, x_ponto, y_ponto):
     else:
         return None
 
+def inside_fuq_v2(lista, x_ponto, y_ponto):
+    x_A, y_A, x_B, y_B, x_C, y_C = lista
+    d1 = dot(x_A, y_A, x_B, y_B, x_ponto, y_ponto)
+    d2 = dot(x_B, y_B, x_C, y_C, x_ponto, y_ponto)
+    d3 = dot(x_C, y_C, x_A, y_A, x_ponto, y_ponto)
+
+    if dot(x_A, y_A, x_B, y_B, x_ponto, y_ponto) >= 0 and dot(x_B, y_B, x_C, y_C, x_ponto, y_ponto) >= 0 and dot(x_C, y_C, x_A, y_A, x_ponto, y_ponto) >= 0:
+        return [d1/dot(x_A, y_A, x_B, y_B, x_C, y_C), d2/dot(x_B, y_B, x_C, y_C, x_A, y_A), d3/dot(x_C, y_C, x_A, y_A, x_B, y_B)]
+    else:
+        return None
+
+def aliasingf(lista, x, y, aliasing=4):
+
+    sumk = 0
+    sksk_return = None
+
+    for kx in range(aliasing):
+        for ky in range(aliasing):
+
+            sksk = inside_fuq_v2(lista, x + (1/(aliasing*2)) + (kx / aliasing), y + (1/(aliasing*2)) + (ky / aliasing))
+
+            if sksk is not None:
+                sksk_return = sksk
+                sumk += 1
+
+    return sumk/(aliasing**2), sksk_return
+
 # web3d.org/documents/specifications/19775-1/V3.0/Part01/components/geometry2D.html#TriangleSet2D
 def triangleSet2D(vertices, colors):
     """Função usada para renderizar TriangleSet2D."""
@@ -247,11 +272,13 @@ def triangleSet2D(vertices, colors):
                     else:
                         print("color error")
 
-def triangleSet3D_lights(vertices, material, lights, aliasing=4):
+def triangleSet3D_lights(vertices, material, lights, pixel_buffer, aliasing=4):
+
+
     for k in range(0, len(vertices), 9):
 
         lista = [vertices[k + i] for i in range(0, 9) if (i + 1) % 3 != 0]
-        x_1, y_1, x_2, y_2, x_3, y_3 = lista
+        
         minX = min([lista[i*2] for i in range(3)])
         maxX = max([lista[i*2] for i in range(3)])
         minY = min([lista[1 + i*2] for i in range(3)])
@@ -259,78 +286,46 @@ def triangleSet3D_lights(vertices, material, lights, aliasing=4):
 
         material["normal"], material["v"] = normal(vertices[k:k + 9])
 
-        aliasing = 1
         print_f = 0
 
-        
-        for x in range(round(minX), round(maxX) + 1, 1):
-            for y in range(round(minY), round(maxY) + 1, 1):
+        for x in range(round(minX), round(maxX), 1):
+            for y in range(round(minY), round(maxY), 1):
 
-                sumk = 0
-
-                for kx in range(aliasing):
-                    for ky in range(aliasing):
-
-                        sksk = inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, x + (1/(aliasing*2)) + (kx / aliasing), y + (1/(aliasing*2)) + (ky / aliasing))
-
-                        if sksk is not None:
-                            sumk += 1
-
+                sumk, sksk = aliasingf(lista, x, y, aliasing=1)
 
                 if sumk > 0:
-                    pixel = irgb(material, lights, print_f)*256
-                    
-                    sumk = (aliasing**2)/sumk
+                    pixel = irgb(material, lights, print_f)*255*sumk
 
-                    pixel = np.around(pixel/sumk)
+                    pixel_buffer[x][y] = np.clip(pixel_buffer[x][y] + pixel, 0, 255)
 
-                    if print_f >= 1:
-                        print(pixel)
-                        # print(material["diffuseColor"])
-                        # print(material["diffuseColor"])
-                        # print(sumk)
-                        print_f = False
-                        
-                    pixel = np.clip(pixel, 0, 255)
-                    gpu.GPU.draw_pixels([x, y], gpu.GPU.RGB8, list(pixel))
-
-def triangleSet3D_white(vertices, aliasing=4):
+def triangleSet3D_white(vertices, pixel_buffer, aliasing=4):
     for k in range(0, len(vertices), 9):
 
         lista = [vertices[k + i] for i in range(0, 9) if (i + 1) % 3 != 0]
-        x_1, y_1, x_2, y_2, x_3, y_3 = lista
+        
         minX = min([lista[i*2] for i in range(3)])
         maxX = max([lista[i*2] for i in range(3)])
         minY = min([lista[1 + i*2] for i in range(3)])
         maxY = max([lista[1 + i*2] for i in range(3)])
 
-        aliasing = 8
-        
-        for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
-            for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
+        for x in range(round(minX), round(maxX), 1):
+            for y in range(round(minY), round(maxY), 1):
 
-                sumk = 0
-
-                for kx in range(aliasing):
-                    for ky in range(aliasing):
-
-                        sksk = inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
-
-                        if sksk is not None:
-                            sumk += 1
-
+                sumk, sksk = aliasingf(lista, x, y)
 
                 if sumk > 0:
-                    pixel = np.array([255, 255, 255])
-                    sumk = int((aliasing**2)/sumk)
-                    pixel //= sumk
-                    gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, list(pixel[:3]))
+                    pixel = np.array([sumk]*3)
 
-def triangleSet3D_color(vertices, color, new_colors, aliasing=4):
+                    pixel *= 255
+
+                    pixel_buffer[x][y] += pixel
+
+def triangleSet3D_color(vertices, color, new_colors, pixel_buffer, aliasing=4):
+
     for k in range(0, len(vertices), 9):
 
         lista = [vertices[k + i] for i in range(0, 9) if (i + 1) % 3 != 0]
-        x_1, y_1, x_2, y_2, x_3, y_3 = lista
+        
         minX = min([lista[i*2] for i in range(3)])
         maxX = max([lista[i*2] for i in range(3)])
         minY = min([lista[1 + i*2] for i in range(3)])
@@ -342,33 +337,27 @@ def triangleSet3D_color(vertices, color, new_colors, aliasing=4):
         rgb1 = [color[new_colors[(k//9)*3 + 1]*3 + bolas] for bolas in range(3)]
         rgb2 = [color[new_colors[(k//9)*3 + 2]*3 + bolas] for bolas in range(3)]
 
-        for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
-            for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
+        for x in range(round(minX), round(maxX), 1):
+            for y in range(round(minY), round(maxY), 1):
 
-                sumk = 0
-                rgb = [0, 0, 0]
+                sumk, sksk = aliasingf(lista, x, y)
 
-                for kx in range(aliasing):
-                    for ky in range(aliasing):
+                if sumk > 0:
+                    rgb = [0, 0, 0]
 
-                        sksk = inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
+                    gamma, alpha, beta = sksk
 
-                        if sksk is not None:
-                            gamma, alpha, beta = sksk
+                    Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
 
-                            Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
-                            sumk += 1
+                    rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
+                    rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
+                    rgb[2] += Z_zao*((rgb0[2]*z0*alpha) + (rgb1[2]*z1*beta) + (rgb2[2]*z2*gamma))
 
-                            rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
-                            rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
-                            rgb[2] += Z_zao*((rgb0[2]*z0*alpha) + (rgb1[2]*z1*beta) + (rgb2[2]*z2*gamma))
+                    rgb = 255*np.array(rgb)*sumk
 
-                if sum(rgb) > 0:
-                    rgb = list(255*np.array(rgb)/(aliasing**2))
-
-                    gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, rgb)
-
-def triangleSet3D_tex(vertices, new_colors, current_texture, texCoord, aliasing=4):
+                    pixel_buffer[x][y] += rgb
+                    
+def triangleSet3D_tex(vertices, new_colors, current_texture, texCoord, pixel_buffer, aliasing=4):
     for k in range(0, len(vertices), 9):
 
         lista = [vertices[k + i] for i in range(0, 9) if (i + 1) % 3 != 0]
@@ -381,36 +370,27 @@ def triangleSet3D_tex(vertices, new_colors, current_texture, texCoord, aliasing=
         z0, z1, z2 = [1/vertices[k + i] for i in range(0, 9) if (i + 1) % 3 == 0]
 
         image = gpu.GPU.load_texture(current_texture[0])
+
         rgb0 = [texCoord[new_colors[(k // 9) * 3 + 0] * 2 + bolas] for bolas in range(2)]
         rgb1 = [texCoord[new_colors[(k // 9) * 3 + 1] * 2 + bolas] for bolas in range(2)]
         rgb2 = [texCoord[new_colors[(k // 9) * 3 + 2] * 2 + bolas] for bolas in range(2)]
 
-        for x in range(int(minX)*aliasing, int(maxX)*aliasing, aliasing):
-            for y in range(int(minY)*aliasing, int(maxY)*aliasing, aliasing):
+        for x in range(round(minX), round(maxX), 1):
+            for y in range(round(minY), round(maxY), 1):
 
-                sumk = 0
-                rgb = [0, 0]
-
-                for kx in range(aliasing):
-                    for ky in range(aliasing):
-
-                        sksk = inside_fuq(x_1, y_1, x_2, y_2, x_3, y_3, (x + kx) / aliasing, (y + ky) / aliasing)
-
-                        if sksk is not None:
-                            gamma, alpha, beta = sksk
-
-                            Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
-
-                            if sumk == 0:
-                                rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
-                                rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
-                            sumk += 1
-
+                sumk, sksk = aliasingf(lista, x, y)
 
                 if sumk > 0:
-                    pixel = image[image.shape[0] - 1 - int(rgb[1] * image.shape[0]), int(rgb[0] * image.shape[1])]
-                    sumk = int((aliasing**2)/sumk)
+                    rgb = [0, 0]
 
-                    pixel //= sumk
-                    gpu.GPU.draw_pixels([int(x/aliasing), int(y/aliasing)], gpu.GPU.RGB8, list(pixel[:3]))
+                    gamma, alpha, beta = sksk
+
+                    Z_zao = 1/((z0*alpha) + (z1*beta) + (z2*gamma))
+
+                    rgb[0] += Z_zao*((rgb0[0]*z0*alpha) + (rgb1[0]*z1*beta) + (rgb2[0]*z2*gamma))
+                    rgb[1] += Z_zao*((rgb0[1]*z0*alpha) + (rgb1[1]*z1*beta) + (rgb2[1]*z2*gamma))
+
+                    pixel = image[image.shape[0] - 1 - int(rgb[1] * image.shape[0]), int(rgb[0] * image.shape[1])]
+
+                    pixel_buffer[x][y] += pixel[:3]*sumk
     
